@@ -31,28 +31,20 @@ int main(int argc, char *argv[])
 	//Preparation
 	initialize();
 
-	//Variable for socket and port
-	int portNumber, sockFD, newsockFD;
+	//Node & master socket, munin port
+	int portNumber = 4949, nodeSocket, masterSocket;
 
-	//Struct server & client
+	//Struct server & client (node, master)
 	struct sockaddr_in serverAddress, clientAddress;
 
 	//Length of socket client
 	socklen_t clientLength;
 
-	//Error if no port specified
-	if (argc < 2) {
-		printError("No port specified");
-	} else {
-		//Set port number
-		portNumber = atoi(argv[1]);
-	}
-
 	//Create socket
-	sockFD = socket(AF_INET, SOCK_STREAM, 0);
+	nodeSocket = socket(AF_INET, SOCK_STREAM, 0);
 
 	//Error if socket creation fail
-	if (sockFD < 0) {
+	if (nodeSocket < 0) {
 		printError("Failed to create/open socket");
 	}
 
@@ -66,35 +58,37 @@ int main(int argc, char *argv[])
 	//Set server port
 	serverAddress.sin_port = htons(portNumber);
 
-	//Error if ...
-	if (bind(sockFD, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0) {
-		printError("Failed tp bind socket to server");	
+	//Error if port already used
+	if (bind(nodeSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0) {
+		printError("Failed to bind socket to server");	
 	}
 	
 	//Let server socket to listen up to 10 client
-	listen(sockFD,10);
+	listen(nodeSocket,10);
 
 	//Don't know
 	clientLength = sizeof(clientAddress);
 
 	//Create socket for client
-	newsockFD = accept(sockFD, (struct sockaddr *) &clientAddress, &clientLength);
+	masterSocket = accept(nodeSocket, (struct sockaddr *) &clientAddress, &clientLength);
 
-	//Error if ...
-	if (newsockFD < 0) {
+	//Error if client fails to accept connection
+	if (masterSocket < 0) {
 		printError("Failed to accept");
 	}
 	
 	//Clear the char/msg buff
 	clearBuff();
 
+	//Loop controller
 	int control = 1;
+	//Write & Read return value
 	int n = -1;
 	while (control==1) {
 		//Read buff msg from client
-		n = read(newsockFD,buffer,255);
+		n = read(masterSocket,buffer,255);
 
-		//Error if ...
+		//Read error
 		if (n < 0) {
 			printError("Failed to read from client socket");
 		}
@@ -107,9 +101,9 @@ int main(int argc, char *argv[])
 			break;
 		} else {
 			respond = messageHandler(buffer);
-			n = write(newsockFD, respond, strlen(respond));
+			n = write(masterSocket, respond, strlen(respond));
 
-			//Error if ...
+			//Write error
 			if (n < 0) {
 				printError("Failed to write to client socket");
 			}
@@ -120,10 +114,10 @@ int main(int argc, char *argv[])
 	}
 
 	//Close socket for client
-	close(newsockFD);
+	close(masterSocket);
 
 	//Close socket for server
-	close(sockFD);
+	close(nodeSocket);
 	return 0; 
 }
 
