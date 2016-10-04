@@ -1,6 +1,5 @@
 //UKAY
 
-/*
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -12,33 +11,28 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h> 
-*/
 
-//void *acceptclient(void *conn){
-    //int *c = (int *) conn;
-/*
+void *acceptclient(void *conn){
+    int *c = (int *) conn;
     char Cinput[20];
     char Coutput[256];
     while(1)
         {    
-            //ticks = time(NULL);*/
-            //read(*c, Cinput, sizeof(Cinput));
-            //printf("%d\n", sizeof(Cinput));
-            /*
+            //ticks = time(NULL);
+            read(*c, Cinput, sizeof(Cinput));
+            //printf("%d\n", (int)sizeof(Cinput));
             if (strcmp(Cinput,"quit")){
                 printf("selamat\n");
             }
-            */
-            //printf("Server: received %s", Cinput);
+            printf("Server: received %s", Cinput);
             /*printf("Please enter the message: ");
             fgets(Coutput,255,stdin);
             write(connfd, Coutput, sizeof(Coutput));*/
-            //sleep(1);
-         //}
-    //close(*c);
-//}
+            sleep(1);
+         }
+    close(*c);
+}
 
-/*
 int main(int argc, char *argv[])
 {
     pthread_t pth[55];
@@ -68,4 +62,3 @@ int main(int argc, char *argv[])
         i++;       
     }
 }
-*/

@@ -3,6 +3,7 @@ TCP Server, port served as an argument
 */
 
 //All the directive header needed
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,15 +11,11 @@ TCP Server, port served as an argument
 #include <sys/types.h> 
 #include <sys/socket.h>
 #include <netinet/in.h>
-
-//Buffer message for client-server communication
-char buffer[256];
+#include <arpa/inet.h>
+#include <pthread.h>
 
 //Preparation
 void initialize();
-
-//Set buff char with 0
-void clearBuff();
 
 //Print error and exit
 void printError(const char *message);
@@ -26,19 +23,23 @@ void printError(const char *message);
 //Returning appropriate message based on input
 char* messageHandler(const char* message);
 
+//Accept new client/master
+void* acceptMaster(void* connection);
+
 int main(int argc, char *argv[])
 {
 	//Preparation
 	initialize();
 
-	//Thread
+	//Thread for establishing connection and do monitoring routines
 	//listenfd -> nodeSocketFD 
-	pthread_t pth[10];
-	int i=0;
-	time_t ticks;
+	//Thread gua/ukay
+	pthread_t connectionThread[10];
+	//Thread jason
+	pthread_t threads;
 
 	//Node & master socket, munin port
-	int portNumber = 4949, nodeSocketFD, masterSocketFD;
+	int portNumber = 4949, nodeSocketFD, masterSocketFD, connectionCount = 0;
 
 	//Struct server & client (node, master)
 	struct sockaddr_in serverAddress, clientAddress;
@@ -55,44 +56,91 @@ int main(int argc, char *argv[])
 	}
 
 	//Make serverAddress, clear the buff
-	bzero((char *) &serverAddress, sizeof(serverAddress));
+	bzero((char*) &serverAddress, sizeof(serverAddress));
 
 	//Set server family
 	serverAddress.sin_family = AF_INET;
 	//Set server address
-	serverAddress.sin_addr.s_addr = INADDR_ANY;
+	//GATAU PAKE YG MANA
+	serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+	//serverAddress.sin_addr.s_addr = INADDR_ANY;
 	//Set server port
 	serverAddress.sin_port = htons(portNumber);
 
 	//Error if port already used
-	if (bind(nodeSocketFD, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0) {
+	if (bind(nodeSocketFD, (struct sockaddr*) &serverAddress, sizeof(serverAddress)) < 0) {
 		printError("Failed to bind socket to server");	
 	}
 	
-	//Let server socket to listen up to 10 client
-	listen(nodeSocketFD,10);
+	//Let server socket to listen up to 5 client
+	listen(nodeSocketFD,5);
 
 	//Don't know
 	clientLength = sizeof(clientAddress);
 
-	//Create socket for client
-	masterSocketFD = accept(nodeSocketFD, (struct sockaddr *) &clientAddress, &clientLength);
+	//Loop to always accept new connection
+	while (masterSocketFD = accept(nodeSocketFD, (struct sockaddr *) &clientAddress, &clientLength)) {
+		//Thread Gua
+		if (pthread_create(&connectionThread[connectionCount], NULL, acceptMaster, (void*) &masterSocketFD) < 0 ) {
+			printError("Failed to create a thread for new connection");
+			break;
+		} else {
+			connectionCount++;
+		}
 
-	//Error if client fails to accept connection
-	if (masterSocketFD < 0) {
-		printError("Failed to accept");
+		//Thread Ukay
+		/*
+		int* connectionFD;
+		*connectionFD = accept(nodeSocketFD, (struct sockaddr*)NULL, NULL);
+		pthread_create(&connectionThread[connectionCount], NULL, acceptMaster, (void*) connectionFD);
+		connectionCount++;
+
+		//Thread Jason
+		if(pthread_create(&threads , NULL ,  newserver , (void*) &newsockFD) < 0)
+        {
+            perror("could not create thread");
+            return 1;
+        }
+		*/
 	}
-	
-	//Clear the char/msg buff
-	clearBuff();
+
+	//Close socket for server
+	close(nodeSocketFD);
+	return 0; 
+}
+
+//Accept new client/master
+void* acceptMaster(void* connection) {
+
+	//Buffer message for client-server communication
+	char buffer[256];
+
+	//Make an empty buff
+	bzero(buffer, 256);
 
 	//Loop controller
 	int control = 1;
 	//Write & Read return value
 	int n = -1;
-	while (control==1) {
+	//Connection var
+	int* masterSocketFD = (int*) connection;
+
+	//Welcoming hostname message
+	char hostName[1024];
+	char* welcome;
+    gethostname(hostName, 1023);
+    asprintf(&welcome, "# munin node at %s\n", hostName);
+	n = write(*masterSocketFD, welcome, strlen(welcome));
+
+	//Write error
+	if (n < 0) {
+		printError("Failed to write to client socket");
+	}
+
+	//The routine communication between client server
+	while(control==1) {
 		//Read buff msg from client
-		n = read(masterSocketFD,buffer,255);
+		n = read(*masterSocketFD, buffer, 255);
 
 		//Read error
 		if (n < 0) {
@@ -107,7 +155,7 @@ int main(int argc, char *argv[])
 			break;
 		} else {
 			respond = messageHandler(buffer);
-			n = write(masterSocketFD, respond, strlen(respond));
+			n = write(*masterSocketFD, respond, strlen(respond));
 
 			//Write error
 			if (n < 0) {
@@ -116,25 +164,19 @@ int main(int argc, char *argv[])
 		}
 
 		//Reset the buff
-		clearBuff();
+		bzero(buffer, 256);
 	}
 
-	//Close socket for client
-	close(masterSocketFD);
+	//Close the socket for client
+	close(*masterSocketFD);
 
-	//Close socket for server
-	close(nodeSocketFD);
-	return 0; 
+	//exit
+	return 0;
 }
 
 //Preparation
 void initialize() {
 
-}
-
-//Set buff char with 0
-void clearBuff() {
-	bzero(buffer, 256);
 }
 
 //Print error and exit
@@ -169,3 +211,9 @@ char* messageHandler(const char* message) {
 		return ("# Unknown command. Try cap, list, nodes, config, fetch, version, or quit\n");
 	}
 }
+
+/*
+//
+	
+*/
+

@@ -1,6 +1,5 @@
 //JASON ABE
 
-/*
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
@@ -246,4 +245,3 @@ void *newserver (void *arg)
     close(sock);
     return NULL;
 }
-*/
